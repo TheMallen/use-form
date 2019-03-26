@@ -61,7 +61,10 @@ export function useQuery() {
     await wait(2000);
 
     if (data.title.toLowerCase().includes('car')) {
-      return [{message: 'No cars allowed'}]
+      return [{
+        fieldPath: ['title'],
+        message: 'The server does not like cars. No cars allowed.',
+      }]
     }
 
     setData(data);

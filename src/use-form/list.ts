@@ -2,37 +2,54 @@ import React, { useReducer, useCallback, useMemo, useEffect } from "react";
 import {
   ValidationDictionary,
   NormalizedValidationDictionary,
+  NormalizedValidationConfig,
   FieldStates,
   FieldDictionary,
   FieldState,
-  ErrorValue,
+  ErrorValue
 } from "./types";
-import { mapObject, createValidationConfig, runValidation } from "./utilities";
-import { reduceField, initialFieldState, FieldAction, updateErrorAction as updateFieldError } from "./field";
+import { mapObject, createValidationConfig } from "./utilities";
+import {
+  reduceField,
+  initialFieldState,
+  FieldAction,
+  updateErrorAction as updateFieldError
+} from "./field";
+
+export interface ListValidationContext<Linked, Item> {
+  linked: Linked;
+  listItem: FieldStates<Item>;
+  siblings: FieldStates<Item>[];
+}
 
 export default function useList<Item, Linked = never>({
   list,
-  validates = {},
+  validates,
 }: {
   list: Item[];
-  validates?: Partial<ValidationDictionary<Item, Linked>>;
+  validates?: Partial<
+    ValidationDictionary<Item, Linked, ListValidationContext<Linked, Item>>
+  >;
 }): FieldDictionary<Item>[] {
   const [state, dispatch] = useReducer(
     (state: { list: FieldStates<Item>[] }, action: ListAction<Item>) => {
       switch (action.type) {
         case "reinitialize": {
           return {
-            list: action.payload.list.map(initialListItemState),
+            list: action.payload.list.map(initialListItemState)
           };
         }
         case "updateError": {
           const {
-            payload: { target, error },
+            payload: { target, error }
           } = action;
           const { index, key } = target;
           const currentItem = state.list[index];
 
-          currentItem[key] = reduceField(currentItem[key], updateFieldError(error));
+          currentItem[key] = reduceField(
+            currentItem[key],
+            updateFieldError(error)
+          );
 
           return { ...state };
         }
@@ -40,77 +57,76 @@ export default function useList<Item, Linked = never>({
         case "reset":
         case "newDefaultValue": {
           const {
-            payload: { target, value },
+            payload: { target, value }
           } = action;
           const { index, key } = target;
           const currentItem = state.list[index];
 
           currentItem[key] = reduceField(currentItem[key], {
             type: action.type,
-            payload: value,
+            payload: value
           } as FieldAction<typeof value>);
 
           return { ...state };
         }
       }
     },
-    {list: list.map(initialListItemState)}
+    { list: list.map(initialListItemState) }
   );
 
-  useEffect(
-    () => {
-      dispatch(reinitializeAction(list));
-    },
-    [list],
-  );
+  useEffect(() => {
+    dispatch(reinitializeAction(list));
+  }, [list]);
 
   const validationConfigs = useMemo(
     () =>
       mapObject<NormalizedValidationDictionary<any>>(
         validates,
-        createValidationConfig,
+        createValidationConfig
       ),
-    [validates],
+    [validates]
   );
 
   const handlers = state.list.map((item, index) => {
     return mapObject<FieldDictionary<Item>>(
       item,
-      <Key extends keyof Item & string>(field: FieldState<Item[Key]>, key: Key) => {
+      <Key extends keyof Item & string>(
+        field: FieldState<Item[Key]>,
+        key: Key
+      ) => {
         const target = { index, key };
 
         return {
           onChange(value: Item[Key]) {
-            dispatch(updateAction({target, value}));
+            dispatch(updateAction({ target, value }));
           },
           reset(value: Item[Key]) {
-            dispatch(resetAction({target, value}));
+            dispatch(resetAction({ target, value }));
           },
           newDefaultValue(value: Item[Key]) {
-            dispatch(newDefaultAction({target, value}));
+            dispatch(newDefaultAction({ target, value }));
           },
           onBlur() {
             const { touched, value } = field;
-            const siblings = state.list.filter((listItem) => listItem != item);
+            const siblings = state.list.filter(listItem => listItem != item);
 
             const newError = runValidation(
               { touched, value, siblings, listItem: item },
-              validationConfigs[key],
+              validationConfigs[key]
             );
 
-            dispatch(updateErrorAction<Item>({target, error: newError}));
+            dispatch(updateErrorAction<Item>({ target, error: newError }));
           }
         };
-      },
+      }
     );
   });
 
   return state.list.map((item, index) => {
     return mapObject(item, (field, key: keyof Item) => {
-      const target = { index, key };
       return {
         ...field,
-        ...handlers[index][key],
+        ...handlers[index][key]
       };
     });
   });
@@ -128,9 +144,9 @@ interface ReinitializeAction<Item> {
   payload: { list: Item[] };
 }
 
-interface TargetedPayload<Item, Key extends keyof Item > {
+interface TargetedPayload<Item, Key extends keyof Item> {
   target: {
-    index: number,
+    index: number;
     key: Key;
   };
   value: Item[Key];
@@ -140,7 +156,7 @@ interface UpdateErrorAction<Item> {
   type: "updateError";
   payload: {
     target: {
-      index: number,
+      index: number;
       key: keyof Item;
     };
     error: ErrorValue;
@@ -165,21 +181,25 @@ interface NewDefaultAction<Item, Key extends keyof Item> {
 function reinitializeAction<Item>(list: Item[]): ReinitializeAction<Item> {
   return {
     type: "reinitialize",
-    payload: { list },
+    payload: { list }
   };
 }
 
-function updateAction<Item, Key extends keyof Item>(payload: TargetedPayload<Item, Key>): UpdateAction<Item, Key> {
+function updateAction<Item, Key extends keyof Item>(
+  payload: TargetedPayload<Item, Key>
+): UpdateAction<Item, Key> {
   return {
     type: "update",
-    payload,
+    payload
   };
 }
 
-function resetAction<Item, Key extends keyof Item>(payload: TargetedPayload<Item, Key>): ResetAction<Item, Key> {
+function resetAction<Item, Key extends keyof Item>(
+  payload: TargetedPayload<Item, Key>
+): ResetAction<Item, Key> {
   return {
     type: "reset",
-    payload,
+    payload
   };
 }
 
@@ -188,19 +208,53 @@ function newDefaultAction<Item, Key extends keyof Item>(
 ): NewDefaultAction<Item, Key> {
   return {
     type: "newDefaultValue",
-    payload,
+    payload
   };
 }
 
 function updateErrorAction<Item>(
-  payload: UpdateErrorAction<Item>['payload']
+  payload: UpdateErrorAction<Item>["payload"]
 ): UpdateErrorAction<Item> {
   return {
     type: "updateError",
-    payload,
+    payload
   };
 }
 
 function initialListItemState<Item>(item: Item) {
   return mapObject<FieldStates<Item>>(item, initialFieldState);
+}
+
+function runValidation<Value, Linked, Record>(
+  state: {
+    touched: boolean;
+    value: Value;
+    listItem: FieldStates<Record>;
+    siblings: FieldStates<Record>[];
+  },
+  validate: NormalizedValidationConfig<
+    Value,
+    Linked,
+    ListValidationContext<Linked, Record>
+  >
+) {
+  const { touched, value, listItem, siblings } = state;
+
+  if (touched === false) {
+    return;
+  }
+
+  const error = validate.using
+    .map(check =>
+      check(value as Value, {
+        linked: validate.with as Linked,
+        listItem,
+        siblings
+      })
+    )
+    .filter(value => value != null);
+
+  if (error && error.length > 0) {
+    return error[0];
+  }
 }

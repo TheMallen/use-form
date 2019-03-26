@@ -1,63 +1,79 @@
-import React, {
-  useReducer,
-  useCallback,
-  useEffect,
-} from "react";
-import { Validates, FieldState, FieldDictionary, Field, ErrorValue } from "./types";
-import { createValidationConfig, runValidation } from "./utilities";
+import React, { useReducer, useCallback, useEffect } from "react";
+import { Validates, FieldState, Field, ErrorValue } from "./types";
+import { createValidationConfig, isChangeEvent } from "./utilities";
 
 interface FieldConfig<Value, Linked> {
-  value: Value,
+  value: Value;
   validates: Validates<Value, Linked>;
 }
 
-export default function useField<Value = string, Linked = never>(input: FieldConfig<Value, Linked> | Value): Field<Value> {
-  const {value, validates} = normalizeFieldConfig(input);
-
+export default function useField<Value = string, Linked = never>(
+  input: FieldConfig<Value, Linked> | Value
+): Field<Value> {
+  const { value, validates } = normalizeFieldConfig(input);
   const validate = createValidationConfig(validates);
 
-  const [state, dispatch] = useReducer(
-    reduceField,
-    initialFieldState(value),
-  );
+  const [state, dispatch] = useReducer(reduceField, initialFieldState(value));
 
-  const onChange = useCallback(value => dispatch(updateAction(value)), []);
   const reset = useCallback(() => dispatch(resetAction(value)), []);
   const newDefaultValue = useCallback(
     value => dispatch(newDefaultAction(value)),
-    [],
+    []
   );
+  const onChange = useCallback((value: any) => {
+    if (isChangeEvent(value)) {
+      dispatch(updateAction(value.target.value));
+      return;
+    }
+    dispatch(updateAction(value));
+  }, []);
+  const setError = useCallback(value => dispatch(updateErrorAction(value)), []);
 
-  const onBlur = useCallback(
-    () => {
-      const { touched, value } = state as FieldState<Value>;
-      const error = runValidation<Value, Linked>({ touched, value }, validate as any);
-      dispatch(updateErrorAction(error));
-    },
-    [state.value, state.touched],
-  );
+  const runValidation = useCallback(() => {
+    const { value } = state;
+
+    const error = validate.using
+      .map(check => check(value as Value, { linked: validate.with as Linked }))
+      .filter(value => value != null);
+
+    if (error && error.length > 0) {
+      return error[0];
+    }
+  }, [state.value]);
+
+  const onBlur = useCallback(() => {
+    if (state.touched === false) {
+      return;
+    }
+
+    const error = runValidation();
+
+    dispatch(updateErrorAction(error));
+  }, [runValidation, state.touched]);
 
   useEffect(onBlur, [validate.with]);
 
-  useEffect(
-    () => {
-      newDefaultValue(value);
-    },
-    [value],
-  );
+  // We want to reset the form whenever a new `value` is passed in
+  useEffect(() => {
+    newDefaultValue(value);
+  }, [value]);
 
   return {
     ...state,
     onBlur,
     onChange,
     newDefaultValue,
-    reset,
+    runValidation,
+    setError,
+    reset
   } as Field<Value>;
 }
 
-function normalizeFieldConfig<Value, Linked>(input: FieldConfig<Value, Linked> | Value): FieldConfig<Value, Linked> {
-  if (input == null || typeof input !== 'object') {
-    return {value: input, validates: () => undefined};
+function normalizeFieldConfig<Value, Linked>(
+  input: FieldConfig<Value, Linked> | Value
+): FieldConfig<Value, Linked> {
+  if (input == null || typeof input !== "object") {
+    return { value: input, validates: () => undefined };
   }
 
   return input as FieldConfig<Value, Linked>;
@@ -86,28 +102,28 @@ interface NewDefaultAction<Value> {
 function updateAction<Value>(value: Value): UpdateAction<Value> {
   return {
     type: "update",
-    payload: value,
+    payload: value
   };
 }
 
 function resetAction<Value>(value: Value): ResetAction<Value> {
   return {
     type: "reset",
-    payload: value,
+    payload: value
   };
 }
 
 function newDefaultAction<Value>(value: Value): NewDefaultAction<Value> {
   return {
     type: "newDefaultValue",
-    payload: value,
+    payload: value
   };
 }
 
 export function updateErrorAction(error: ErrorValue): UpdateErrorAction {
   return {
     type: "updateError",
-    payload: error,
+    payload: error
   };
 }
 
@@ -119,7 +135,7 @@ export type FieldAction<Value> =
 
 export function reduceField<Value>(
   state: FieldState<Value>,
-  action: FieldAction<Value>,
+  action: FieldAction<Value>
 ) {
   switch (action.type) {
     case "update": {
@@ -130,14 +146,14 @@ export function reduceField<Value>(
         ...state,
         dirty: defaultValue !== newValue,
         value: newValue,
-        touched: true,
+        touched: true
       };
     }
 
     case "updateError": {
       return {
         ...state,
-        error: action.payload,
+        error: action.payload
       };
     }
 
@@ -148,7 +164,7 @@ export function reduceField<Value>(
         ...state,
         value: defaultValue,
         dirty: false,
-        touched: false,
+        touched: false
       };
     }
 
@@ -159,7 +175,7 @@ export function reduceField<Value>(
         value: newDefaultValue,
         defaultValue: newDefaultValue,
         touched: false,
-        dirty: false,
+        dirty: false
       };
     }
   }
@@ -171,6 +187,6 @@ export function initialFieldState<Value>(value: Value): FieldState<Value> {
     defaultValue: value,
     error: undefined,
     touched: false,
-    dirty: false,
+    dirty: false
   };
 }

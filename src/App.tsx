@@ -1,13 +1,11 @@
 import React from "react";
 
-import { useField, useList, useForm } from "./use-form";
-import { ValidationContext } from "./use-form/types";
+import { useField, useList, useForm, ListValidationContext } from "./use-form";
 import { notEmpty, numeric, lengthMoreThan } from "./use-form/validation";
 
 import { useQuery, Variant } from "./fakeAPI";
 
 import {
-  AppProvider,
   Page,
   TextField,
   FormLayout,
@@ -32,12 +30,12 @@ export default function App() {
     ]
   });
 
-  // this can let you do cool stuff like link fields to validate off one another
+  // this can let you do cool stuff like link fields to validate off one another (or anything)
   const firstVariantPrice = useField({
     value: data.firstVariant.price,
     validates: {
       with: title.value,
-      using(price: string, { linked }: ValidationContext<string>) {
+      using(price: string, { linked }) {
         const priceAsNumber = parseFloat(price);
         if (
           linked.toLowerCase().includes("expensive") &&
@@ -45,9 +43,13 @@ export default function App() {
         ) {
           return "Expensive items must cost more than 1000 dollars";
         }
-      },
+      }
     }
   });
+
+  // each field also has imperative methods for find grained control in edge-cases
+  // eg.
+  // firstVariantPrice.updateDefaultValue('88888');
 
   // or you can define fields inline in the call to useForm
   const { fields, submit, submitting, dirty, reset, remoteErrors } = useForm({
@@ -74,7 +76,7 @@ export default function App() {
               notEmpty("Variants must have values"),
               (
                 value: string,
-                { listItem, siblings }: ValidationContext<never, Variant>
+                { siblings, listItem }: ListValidationContext<never, Variant>
               ) => {
                 const { option } = listItem;
                 const similarSiblings = siblings.filter(
@@ -93,6 +95,7 @@ export default function App() {
       })
     },
     async onSubmit(form) {
+      // the fake API will return an error if your title (case insensitive) includes 'car'
       const remoteErrors = await update({
         ...form,
         variants: Array.from(form.variants)
@@ -122,97 +125,101 @@ export default function App() {
   // }, fields);
 
   return (
-    <AppProvider>
-      <Frame>
-        <Form onSubmit={submit}>
-          <Page title={data.title || "..."}>
-            {dirty && (
-              <ContextualSaveBar
-                message="Unsaved product"
-                saveAction={{
-                  onAction: submit,
-                  loading: submitting,
-                  disabled: false
-                }}
-                discardAction={{
-                  onAction: reset
-                }}
-              />
-            )}
-            <Layout>
-              {remoteErrors.length > 0 && (
-                <Layout.Section>
-                  <Banner status="critical">{remoteErrors.join("\n")}</Banner>
-                </Layout.Section>
-              )}
+    <Frame>
+      <Form onSubmit={submit}>
+        <Page title={data.title || "..."}>
+          {dirty && (
+            <ContextualSaveBar
+              message="Unsaved product"
+              saveAction={{
+                onAction: submit,
+                loading: submitting,
+                disabled: false
+              }}
+              discardAction={{
+                onAction: reset
+              }}
+            />
+          )}
+          <Layout>
+            {remoteErrors.length > 0 && (
               <Layout.Section>
-                <Card>
-                  <Card.Section>
-                    <FormLayout>
-                      <TextField label="Title" {...fields.title} />
-                      <TextField
-                        multiline
-                        label="Description"
-                        disabled={data.loading}
-                        {...fields.description}
-                      />
-                    </FormLayout>
-                  </Card.Section>
-                </Card>
-                <Card>
-                  <Card.Section>
-                    <FormLayout>
-                      <TextField
-                        label="Option"
-                        disabled
-                        {...fields.firstVariant.option}
-                      />
-                      <TextField
-                        label="Value"
-                        disabled={data.loading}
-                        {...fields.firstVariant.value}
-                      />
-                      <TextField
-                        label="Price"
-                        type="currency"
-                        disabled={data.loading}
-                        {...fields.firstVariant.price}
-                      />
-                    </FormLayout>
-                  </Card.Section>
-                  {fields.variants.length > 0 && (
-                    <Card.Section>
-                      <Stack vertical>
-                        {fields.variants.map(variant => {
-                          return (
-                            <Stack vertical key={variant.option.defaultValue}>
-                              <TextField
-                                label="Option"
-                                disabled
-                                {...variant.option}
-                              />
-                              <TextField
-                                label="Value"
-                                disabled={data.loading}
-                                {...variant.value}
-                              />
-                              <TextField
-                                label="Price"
-                                disabled={data.loading}
-                                {...variant.price}
-                              />
-                            </Stack>
-                          );
-                        })}
-                      </Stack>
-                    </Card.Section>
-                  )}
-                </Card>
+                <Banner status="critical">
+                  {remoteErrors.map(({ message }) => message).join("\n")}
+                </Banner>
               </Layout.Section>
-            </Layout>
-          </Page>
-        </Form>
-      </Frame>
-    </AppProvider>
+            )}
+            <Layout.Section>
+              <Card>
+                <Card.Section>
+                  <FormLayout>
+                    <TextField
+                      label="Title"
+                      disabled={data.loading}
+                      {...fields.title}
+                    />
+                    <TextField
+                      multiline
+                      label="Description"
+                      disabled={data.loading}
+                      {...fields.description}
+                    />
+                  </FormLayout>
+                </Card.Section>
+              </Card>
+              <Card>
+                <Card.Section>
+                  <FormLayout>
+                    <TextField
+                      label="Option"
+                      disabled
+                      {...fields.firstVariant.option}
+                    />
+                    <TextField
+                      label="Value"
+                      disabled={data.loading}
+                      {...fields.firstVariant.value}
+                    />
+                    <TextField
+                      label="Price"
+                      type="currency"
+                      disabled={data.loading}
+                      {...fields.firstVariant.price}
+                    />
+                  </FormLayout>
+                </Card.Section>
+                {fields.variants.length > 0 && (
+                  <Card.Section>
+                    <Stack vertical>
+                      {fields.variants.map(variant => {
+                        return (
+                          <Stack vertical key={variant.option.defaultValue}>
+                            <TextField
+                              label="Option"
+                              disabled
+                              {...variant.option}
+                            />
+                            <TextField
+                              label="Value"
+                              disabled={data.loading}
+                              {...variant.value}
+                            />
+                            <TextField
+                              label="Price"
+                              disabled={data.loading}
+                              {...variant.price}
+                            />
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  </Card.Section>
+                )}
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </Page>
+      </Form>
+    </Frame>
   );
 }

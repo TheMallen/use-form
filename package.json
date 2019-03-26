@@ -10,6 +10,7 @@
     "@types/react": "16.8.8",
     "@types/react-dom": "16.8.3",
     "faker": "^4.1.0",
+    "get-value": "^3.0.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",
     "react-scripts": "2.1.8",
@@ -29,5 +30,8 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
-  ]
+  ],
+  "devDependencies": {
+    "@types/get-value": "^3.0.0"
+  }
 }

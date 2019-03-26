@@ -1,36 +1,36 @@
+import {ChangeEvent} from 'react';
+
 export type ErrorValue = string | undefined;
 
-export interface Validator<Value, Linked, Record = any> {
-  (value: Value, context: ValidationContext<Linked, Record>): ErrorValue;
+export interface Validator<Value, Linked, Context> {
+  (value: Value, context: Context): ErrorValue;
 }
 
-export interface ValidationContext<Linked, Record = any> {
+export interface ValidationContext<Linked> {
   linked: Linked;
-  siblings: FieldStates<Record>[];
-  listItem: FieldStates<Record>;
 }
 
-export interface NormalizedValidationConfig<Value, Linked> {
-  using: Validator<Value, Linked>[];
+export interface NormalizedValidationConfig<Value, Linked, Context> {
+  using: Validator<Value, Linked, Context>[];
   with?: Linked;
 }
 
-export interface ValidationConfig<Value, Linked> {
-  using: Validator<Value, Linked> | Validator<Value, Linked>[];
+export interface ValidationConfig<Value, Linked, Context> {
+  using: Validator<Value, Linked, Context> | Validator<Value, Linked, Context>[];
   with?: Linked;
 }
 
-export type Validates<Value, Linked> =
-  | Validator<Value, Linked>
-  | Validator<Value, Linked>[]
-  | ValidationConfig<Value, Linked>;
+export type Validates<Value, Linked, Context = ValidationContext<Linked>> =
+  | Validator<Value, Linked, Context>
+  | Validator<Value, Linked, Context>[]
+  | ValidationConfig<Value, Linked, Context>;
 
 export type NormalizedValidationDictionary<ListItem extends Object> = {
-  [Key in keyof ListItem]: NormalizedValidationConfig<ListItem[Key], any>
+  [Key in keyof ListItem]: NormalizedValidationConfig<ListItem[Key], any, any>
 };
 
-export type ValidationDictionary<ListItem extends Object, Linked> = {
-  [Key in keyof ListItem]: Validates<ListItem[Key], Linked>
+export type ValidationDictionary<ListItem extends Object, Linked, Context = ValidationContext<Linked>> = {
+  [Key in keyof ListItem]: Validates<ListItem[Key], Linked, Context>
 };
 
 export interface FieldState<Value> {
@@ -52,7 +52,9 @@ export interface Field<Value> {
   touched: boolean;
   dirty: boolean;
   onBlur(): void;
-  onChange(value: Value): void;
+  onChange(value: Value | ChangeEvent<HTMLInputElement>): void;
+  runValidation(): ErrorValue;
+  setError(value: ErrorValue): void;
   newDefaultValue(value: Value): void;
   reset(): void;
 }

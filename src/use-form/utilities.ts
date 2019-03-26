@@ -1,7 +1,7 @@
+import {ChangeEvent} from 'react';
 import {
   Validates,
   NormalizedValidationConfig,
-  FieldStates,
   FieldOutput,
   Field
 } from "./types";
@@ -26,9 +26,9 @@ export function mapObject<Output>(
   }, {}) as Output;
 }
 
-export function createValidationConfig<Value, With>(
-  input: Validates<Value, With>,
-): NormalizedValidationConfig<Value, With> {
+export function createValidationConfig<Value, With, Context>(
+  input: Validates<Value, With, Context>,
+): NormalizedValidationConfig<Value, With, Context> {
   if (typeof input === "function") {
     return {
       using: [input],
@@ -48,23 +48,6 @@ export function createValidationConfig<Value, With>(
   };
 }
 
-export function runValidation<Value, Linked>(
-  state: { touched: boolean; value: Value; listItem?: FieldStates<any>; siblings?: any[] },
-  validate: NormalizedValidationConfig<Value, Linked>,
-) {
-  const { touched, value, listItem = {}, siblings = [] } = state;
-
-  if (touched === false) {
-    return;
-  }
-
-  const error = validate.using
-    .map(check =>
-      check(value as Value, { linked: validate.with as Linked, listItem, siblings }),
-    )
-    .filter(value => value != null);
-
-  if (error && error.length > 0) {
-    return error[0];
-  }
+export function isChangeEvent(value: any): value is ChangeEvent<HTMLInputElement> {
+  return typeof value === 'object' && Reflect.has(value, 'target') && Reflect.has(value.target, 'value');
 }

@@ -1,11 +1,11 @@
 import React, { useCallback } from "react";
-import { FieldDictionary, Field, FieldOutput } from "./types";
+import { FieldDictionary, FieldOutput } from "./types";
 import { isField } from './utilities';
 
 export default function useReset(fieldBag: { [key: string]: FieldOutput<unknown> }) {
-  const fields = Object.values(fieldBag);
-
   const reset = useCallback(() => {
+    const fields = Object.values(fieldBag);
+    
     for (const item of fields) {
       if (isField(item)) {
         item.reset();
@@ -19,7 +19,7 @@ export default function useReset(fieldBag: { [key: string]: FieldOutput<unknown>
 
       resetFields(item);
     }
-  }, fields);
+  }, [fieldBag]);
 
   return reset;
 }
