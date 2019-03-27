@@ -1,37 +1,49 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
-  FieldDictionary,
-  FormValues,
+  FormMapping,
   SubmitHandler,
   FieldBag,
-  RemoteError,
+  FormError,
+  FieldDictionary
 } from "./types";
 import { mapObject, isField } from "./utilities";
 
 export default function useSubmit<T extends FieldBag>(
-  onSubmit: SubmitHandler<FormValues<T>>,
-  fieldBag: T,
-): [() => void, boolean, RemoteError[], (errors: RemoteError[]) => void] {
+  onSubmit: SubmitHandler<FormMapping<T, "value">>,
+  fieldBag: T
+): [
+  (event?: React.FormEvent) => Promise<void>,
+  boolean,
+  FormError[],
+  (errors: FormError[]) => void
+] {
   const [submitting, setSubmitting] = useState(false);
-  const [remoteErrors, setRemoteErrors] = useState([] as RemoteError[]);
+  const [remoteErrors, setRemoteErrors] = useState([] as FormError[]);
 
-  const submit = useCallback(async () => {
-    setSubmitting(true);
-    const result = await onSubmit(getValues(fieldBag));
-    setSubmitting(false);
+  const submit = useCallback(
+    async (event?: React.FormEvent) => {
+      if (event && event.preventDefault && !event.defaultPrevented) {
+        event.preventDefault();
+      }
 
-    if (result.status === "fail") {
-      setRemoteErrors(result.errors);
-    } else {
-      setRemoteErrors([]);
-    }
-  }, [fieldBag]);
+      setSubmitting(true);
+      const result = await onSubmit(getValues(fieldBag));
+      setSubmitting(false);
+
+      if (result.status === "fail") {
+        setRemoteErrors(result.errors);
+      } else {
+        setRemoteErrors([]);
+      }
+    },
+    [fieldBag]
+  );
 
   return [submit, submitting, remoteErrors, setRemoteErrors];
 }
 
 function getValues<T extends FieldBag>(fieldBag: T) {
-  return mapObject<FormValues<T>>(fieldBag, item => {
+  return mapObject<FormMapping<T, "value">>(fieldBag, item => {
     if (isField(item)) {
       return item.value;
     }

@@ -1,6 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 
-import { useField, useList, useForm, ListValidationContext } from "./use-form";
+import {
+  useField,
+  useList,
+  useForm,
+  ListValidationContext,
+  FieldDictionary
+} from "./use-form";
 import { notEmpty, numeric, lengthMoreThan } from "./use-form/validation";
 
 import { useQuery, Variant } from "./fakeAPI";
@@ -9,7 +15,6 @@ import {
   Page,
   TextField,
   FormLayout,
-  Stack,
   Card,
   Layout,
   Form,
@@ -19,7 +24,8 @@ import {
 } from "@shopify/polaris";
 
 export default function App() {
-  const { data, update } = useQuery();
+  const [creating] = useState(true);
+  const { data, update } = useQuery(creating);
 
   // You can use fields individually outside of a useForm
   const title = useField({
@@ -52,7 +58,7 @@ export default function App() {
   // firstVariantPrice.updateDefaultValue('88888');
 
   // or you can define fields inline in the call to useForm
-  const { fields, submit, submitting, dirty, reset, remoteErrors } = useForm({
+  const { fields, submit, submitting, dirty, reset, submitErrors } = useForm({
     fields: {
       title,
       description: useField(data.description),
@@ -124,10 +130,16 @@ export default function App() {
   //   return { status: "success" };
   // }, fields);
 
+  const pageTitle = data.loading
+    ? data.title || "..."
+    : data.title || "New Product";
+
+  console.log(submitErrors);
+
   return (
     <Frame>
       <Form onSubmit={submit}>
-        <Page title={data.title || "..."}>
+        <Page title={pageTitle}>
           {dirty && (
             <ContextualSaveBar
               message="Unsaved product"
@@ -142,10 +154,15 @@ export default function App() {
             />
           )}
           <Layout>
-            {remoteErrors.length > 0 && (
+            {submitErrors.length > 0 && (
               <Layout.Section>
                 <Banner status="critical">
-                  {remoteErrors.map(({ message }) => message).join("\n")}
+                  <p>There were some issues with your form submission:</p>
+                  <ul>
+                    {submitErrors.map(({ message }, index) => {
+                      return <li key={`${message}${index}`}>{message}</li>;
+                    })}
+                  </ul>
                 </Banner>
               </Layout.Section>
             )}
@@ -167,59 +184,35 @@ export default function App() {
                   </FormLayout>
                 </Card.Section>
               </Card>
-              <Card>
-                <Card.Section>
-                  <FormLayout>
-                    <TextField
-                      label="Option"
-                      disabled
-                      {...fields.firstVariant.option}
-                    />
-                    <TextField
-                      label="Value"
-                      disabled={data.loading}
-                      {...fields.firstVariant.value}
-                    />
-                    <TextField
-                      label="Price"
-                      type="currency"
-                      disabled={data.loading}
-                      {...fields.firstVariant.price}
-                    />
-                  </FormLayout>
-                </Card.Section>
-                {fields.variants.length > 0 && (
-                  <Card.Section>
-                    <Stack vertical>
-                      {fields.variants.map(variant => {
-                        return (
-                          <Stack vertical key={variant.option.defaultValue}>
-                            <TextField
-                              label="Option"
-                              disabled
-                              {...variant.option}
-                            />
-                            <TextField
-                              label="Value"
-                              disabled={data.loading}
-                              {...variant.value}
-                            />
-                            <TextField
-                              label="Price"
-                              disabled={data.loading}
-                              {...variant.price}
-                            />
-                          </Stack>
-                        );
-                      })}
-                    </Stack>
-                  </Card.Section>
-                )}
-              </Card>
+              <VariantCard variant={fields.firstVariant} />
+
+              {fields.variants.length > 0 && (
+                fields.variants.map(variant => {
+                  return <VariantCard variant={variant} />;
+                })
+              )}
             </Layout.Section>
           </Layout>
         </Page>
       </Form>
     </Frame>
+  );
+}
+
+function VariantCard({
+  variant,
+}: {
+  variant: FieldDictionary<Variant>;
+}) {
+  return (
+    <Card>
+      <Card.Section>
+        <FormLayout>
+          <TextField label="Option" disabled {...variant.option} />
+          <TextField label="Value" {...variant.value} />
+          <TextField label="Price" type="currency" {...variant.price} />
+        </FormLayout>
+      </Card.Section>
+    </Card>
   );
 }

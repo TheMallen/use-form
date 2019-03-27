@@ -14,22 +14,26 @@ export interface Variant {
   price: string;
 }
 
-export function useQuery() {
+export function useQuery(creating: boolean = true) {
   const [data, setData] = useState({
     title: "",
     description: "",
-    firstVariant: { option: "", value: "", price: "" },
+    firstVariant: { option: "Color", value: "", price: "" },
     variants: [] as Variant[]
   });
 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (creating) {
+      return;
+    }
+
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
       setData({
-        title: faker.commerce.product(),
+        title: 'thing',
         description: faker.lorem.paragraph(),
         firstVariant: {
           option: "color",

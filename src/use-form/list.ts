@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback, useMemo, useEffect } from "react";
+import React, { useReducer, useMemo, useEffect } from "react";
 import {
   ValidationDictionary,
   NormalizedValidationDictionary,
@@ -24,7 +24,7 @@ export interface ListValidationContext<Linked, Item> {
 
 export default function useList<Item, Linked = never>({
   list,
-  validates,
+  validates
 }: {
   list: Item[];
   validates?: Partial<
@@ -53,8 +53,18 @@ export default function useList<Item, Linked = never>({
 
           return { ...state };
         }
+        case "reset": {
+          const {
+            payload: { target }
+          } = action;
+          const { index, key } = target;
+          const currentItem = state.list[index];
+
+          currentItem[key] = reduceField(currentItem[key], { type: "reset" });
+
+          return { ...state };
+        }
         case "update":
-        case "reset":
         case "newDefaultValue": {
           const {
             payload: { target, value }
@@ -96,26 +106,41 @@ export default function useList<Item, Linked = never>({
       ) => {
         const target = { index, key };
 
+        function validate() {
+          const validates = validationConfigs[key];
+
+          if (validates == null) {
+            return;
+          }
+
+          const siblings = state.list.filter(listItem => listItem != item);
+
+          runValidation(
+            error => dispatch(updateErrorAction<Item>({ target, error })),
+            { value: field.value, siblings, listItem: item },
+            validates
+          );
+        }
+
         return {
           onChange(value: Item[Key]) {
             dispatch(updateAction({ target, value }));
           },
-          reset(value: Item[Key]) {
-            dispatch(resetAction({ target, value }));
+          reset() {
+            dispatch(resetAction({ target }));
           },
           newDefaultValue(value: Item[Key]) {
             dispatch(newDefaultAction({ target, value }));
           },
+          runValidation: validate,
           onBlur() {
-            const { touched, value } = field;
-            const siblings = state.list.filter(listItem => listItem != item);
+            const { touched, error } = field;
 
-            const newError = runValidation(
-              { touched, value, siblings, listItem: item },
-              validationConfigs[key]
-            );
+            if (touched === false && error == null) {
+              return;
+            }
 
-            dispatch(updateErrorAction<Item>({ target, error: newError }));
+            validate();
           }
         };
       }
@@ -165,7 +190,12 @@ interface UpdateErrorAction<Item> {
 
 interface ResetAction<Item, Key extends keyof Item> {
   type: "reset";
-  payload: TargetedPayload<Item, Key>;
+  payload: {
+    target: {
+      index: number;
+      key: Key;
+    };
+  };
 }
 
 interface UpdateAction<Item, Key extends keyof Item> {
@@ -195,7 +225,7 @@ function updateAction<Item, Key extends keyof Item>(
 }
 
 function resetAction<Item, Key extends keyof Item>(
-  payload: TargetedPayload<Item, Key>
+  payload: ResetAction<Item, Key>['payload']
 ): ResetAction<Item, Key> {
   return {
     type: "reset",
@@ -226,8 +256,8 @@ function initialListItemState<Item>(item: Item) {
 }
 
 function runValidation<Value, Linked, Record>(
+  updateError: (error: ErrorValue) => void,
   state: {
-    touched: boolean;
     value: Value;
     listItem: FieldStates<Record>;
     siblings: FieldStates<Record>[];
@@ -238,11 +268,7 @@ function runValidation<Value, Linked, Record>(
     ListValidationContext<Linked, Record>
   >
 ) {
-  const { touched, value, listItem, siblings } = state;
-
-  if (touched === false) {
-    return;
-  }
+  const { value, listItem, siblings } = state;
 
   const error = validate.using
     .map(check =>
@@ -255,6 +281,10 @@ function runValidation<Value, Linked, Record>(
     .filter(value => value != null);
 
   if (error && error.length > 0) {
-    return error[0];
+    const [firstError] = error;
+    updateError(firstError);
+    return firstError;
   }
+
+  updateError(undefined);
 }

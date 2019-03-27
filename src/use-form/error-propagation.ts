@@ -1,17 +1,16 @@
 import React, { useEffect } from "react";
 import get from "get-value";
 
-import { FieldOutput, RemoteError } from "./types";
+import { FieldOutput, FormError } from "./types";
 import { isField } from "./utilities";
 
 export default function useErrorPropagation(
   fieldBag: { [key: string]: FieldOutput<unknown> },
-  remoteErrors: RemoteError[]
+  remoteErrors: FormError[]
 ) {
   useEffect(() => {
     remoteErrors
       .forEach(error => {
-        console.log(error);
         if (error.fieldPath == null) {
           return;
         }
